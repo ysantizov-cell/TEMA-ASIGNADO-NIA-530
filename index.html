@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Ruta — Extrapolación de Incorrecciones (NIA 530)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3B2E22;
+    --board:#1E1912;
+    --paper:#F1E6CE;
+    --cream:#F2E6C9;
+    --sage:#C9D3B6;
+    --mustard:#EAC077;
+    --terracota:#DE9C7C;
+    --dustyblue:#A9C0CB;
+    --olive:#C6C58C;
+    --rust:#B5502E;
+  }
+ 
+  *{box-sizing:border-box;}
+ 
+  @keyframes pageIn{ from{ opacity:0; transform:rotate(3deg) translateY(24px); } to{ opacity:1; transform:rotate(0.5deg) translateY(0); } }
+  @keyframes popScale{ from{ opacity:0; transform:scale(.7); } to{ opacity:1; transform:scale(1); } }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:translateY(0); } }
+  @keyframes fadeLeft{ from{ opacity:0; transform:translateX(-16px); } to{ opacity:1; transform:translateX(0); } }
+  @keyframes fadeRight{ from{ opacity:0; transform:translateX(16px); } to{ opacity:1; transform:translateX(0); } }
+  @keyframes wobble{ 0%,100%{ transform:rotate(0deg) scale(1.03); } 50%{ transform:rotate(-1deg) scale(1.04); } }
+  @keyframes stampIn{ 0%{ opacity:0; transform:scale(2) rotate(-18deg); } 60%{ opacity:1; transform:scale(.85) rotate(-14deg); } 100%{ opacity:1; transform:scale(1) rotate(-14deg); } }
+  @keyframes marchDash{ to{ stroke-dashoffset:-120; } }
+  @media (prefers-reduced-motion:reduce){ *{ animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+ 
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 80% 10%, rgba(255,255,255,.04), transparent 40%),
+      var(--board);
+    font-family:'Patrick Hand', cursive;
+    color:var(--ink);
+    padding:40px 16px 60px;
+    display:flex;
+    justify-content:center;
+  }
+ 
+  .wrap{ max-width:1560px; width:100%; }
+  .page-outer{ display:flex; justify-content:center; }
+ 
+  .page{
+    position:relative;
+    width:1500px;
+    max-width:100%;
+    background:var(--paper);
+    padding:34px 26px 60px;
+    transform:rotate(0.5deg);
+    box-shadow:0 30px 60px rgba(0,0,0,.45), 0 4px 0 rgba(0,0,0,.15);
+    animation:pageIn .8s cubic-bezier(.2,.7,.3,1) both;
+    clip-path:polygon(
+      0% 1.5%, 4% 0%, 9% 1.2%, 16% 0%, 23% 1%, 30% 0%, 38% 1.2%, 47% 0%, 55% 1%, 63% 0%, 72% 1.3%, 81% 0%, 90% 1%, 96% 0%, 100% 1.5%,
+      99% 8%, 100% 16%, 99% 24%, 100% 32%, 99% 41%, 100% 50%, 99% 59%, 100% 68%, 99% 77%, 100% 86%, 99% 93%, 100% 98.5%,
+      96% 100%, 88% 99%, 79% 100%, 70% 99%, 61% 100%, 52% 99%, 43% 100%, 34% 99%, 25% 100%, 16% 99%, 8% 100%, 3% 99%, 0% 98.5%,
+      1% 91%, 0% 83%, 1% 74%, 0% 65%, 1% 56%, 0% 47%, 1% 38%, 0% 29%, 1% 20%, 0% 12%, 1% 5%
+    );
+  }
+ 
+  .page::after{
+    content:"";
+    position:absolute; inset:0;
+    background-image:radial-gradient(rgba(59,46,34,.05) 1px, transparent 1.4px);
+    background-size:5px 5px;
+    pointer-events:none;
+    mix-blend-mode:multiply;
+  }
+ 
+  .tape{
+    position:absolute;
+    height:38px;
+    background:repeating-linear-gradient(45deg, rgba(181,80,46,.55) 0 8px, rgba(222,156,124,.55) 8px 16px);
+    opacity:.75;
+    box-shadow:0 2px 4px rgba(0,0,0,.15);
+  }
+  .tape.t1{ width:140px; left:80px; top:-16px; transform:rotate(5deg); }
+  .tape.t2{ width:140px; right:90px; top:-14px; transform:rotate(-6deg); }
+ 
+  /* ---------- title cartouche ---------- */
+  .title-plate{
+    position:relative;
+    max-width:760px;
+    margin:6px auto 22px;
+    background:var(--cream);
+    padding:20px 34px 22px;
+    text-align:center;
+    box-shadow:0 8px 18px rgba(0,0,0,.18);
+    transform:rotate(-0.8deg);
+    animation:fadeUp .6s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .title-plate .pin{
+    position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+    width:16px; height:16px; border-radius:50%;
+    background:var(--rust); box-shadow:0 2px 3px rgba(0,0,0,.35);
+  }
+  .title-plate .compass{ margin:0 auto 4px; display:block; }
+  .title-plate h1{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:44px;
+    margin:0 0 4px;
+    color:var(--ink);
+    line-height:1.05;
+  }
+  .title-plate p{
+    font-family:'Patrick Hand', cursive;
+    font-size:15px;
+    margin:0;
+    color:var(--ink);
+    opacity:.85;
+  }
+ 
+  .progress-badge{
+    position:absolute;
+    right:26px; top:16px;
+    background:var(--mustard);
+    padding:10px 16px 12px;
+    transform:rotate(3deg);
+    box-shadow:0 6px 14px rgba(0,0,0,.2);
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:19px;
+    color:var(--ink);
+    animation:fadeUp .6s cubic-bezier(.2,.7,.3,1) both;
+    animation-delay:.2s;
+  }
+  .progress-badge .pin{
+    position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+    width:14px; height:14px; border-radius:50%;
+    background:var(--rust); box-shadow:0 2px 3px rgba(0,0,0,.35);
+  }
+ 
+  .howto-badge{
+    position:absolute;
+    left:26px; top:16px;
+    max-width:280px;
+    background:var(--sage);
+    padding:11px 16px 13px;
+    transform:rotate(-2deg);
+    box-shadow:0 6px 14px rgba(0,0,0,.2);
+    font-family:'Patrick Hand', cursive;
+    font-size:14px;
+    line-height:1.35;
+    color:var(--ink);
+    animation:fadeUp .6s cubic-bezier(.2,.7,.3,1) both;
+    animation-delay:.1s;
+  }
+  .howto-badge b{ font-family:'Caveat', cursive; font-weight:700; font-size:18px; display:block; margin-bottom:2px; }
+  .howto-badge .pin{
+    position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+    width:14px; height:14px; border-radius:50%;
+    background:var(--rust); box-shadow:0 2px 3px rgba(0,0,0,.35);
+  }
+ 
+  /* ---------- trail ---------- */
+  .trail{ position:relative; width:1450px; max-width:100%; height:1780px; margin:0 auto; }
+  .trail svg{ position:absolute; left:0; top:0; }
+  .trail-line-bg{ stroke:var(--ink); stroke-width:3; fill:none; opacity:.18; stroke-linecap:round; }
+  .trail-line-dash{ stroke:var(--rust); stroke-width:2.5; fill:none; opacity:.65; stroke-linecap:round; stroke-dasharray:2 14; animation:marchDash 3s linear infinite; }
+  @media (prefers-reduced-motion:reduce){ .trail-line-dash{ animation:none; } }
+ 
+  .marker{
+    position:absolute;
+    width:62px; height:62px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .marker .ring{
+    position:absolute; inset:0;
+    border-radius:50%;
+    border:2px dashed var(--ink);
+    opacity:.5;
+    transform:rotate(-6deg);
+  }
+  .marker .core{
+    width:48px; height:48px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:22px;
+    box-shadow:0 6px 12px rgba(0,0,0,.25);
+    border:2.5px solid rgba(255,255,255,.7);
+  }
+  .marker{ animation:popScale .5s cubic-bezier(.2,.7,.3,1) both; }
+  .k1 .core{ background:#2A5C8A; }
+  .k2 .core{ background:var(--terracota); }
+  .k3 .core{ background:var(--rust); }
+  .k4 .core{ background:#1C7C74; }
+  .k5 .core{ background:#8A6B2E; }
+  .k6 .core{ background:#4A6B4E; }
+ 
+  .step{
+    position:absolute;
+    width:540px;
+    background:var(--cream);
+    padding:18px 22px 20px;
+    box-shadow:0 8px 18px rgba(0,0,0,.18);
+    cursor:pointer;
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .step .pin{
+    position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+    width:15px; height:15px; border-radius:50%;
+    background:var(--rust); box-shadow:0 2px 3px rgba(0,0,0,.35);
+  }
+  .step:hover{ box-shadow:0 16px 28px rgba(0,0,0,.26); }
+  .step.right{ animation:fadeRight .6s cubic-bezier(.2,.7,.3,1) both; transform:rotate(1deg); }
+  .step.right:hover{ animation:wobble .5s ease-in-out; }
+  .step.left{ animation:fadeLeft .6s cubic-bezier(.2,.7,.3,1) both; transform:rotate(-1deg); }
+  .step.left:hover{ animation:wobble .5s ease-in-out; }
+  .step:active{ transform:scale(.98); }
+ 
+  .step-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .step-head .icon{ flex:none; }
+  .step h3{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:25px;
+    margin:0;
+    color:var(--ink);
+    cursor:pointer;
+    line-height:1.1;
+  }
+  .step h3:hover{ text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--rust); }
+  .step .see-more{
+    display:block;
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:20px;
+    color:var(--rust);
+    opacity:.9;
+    margin:2px 0 8px 50px;
+  }
+  .step p{
+    font-family:'Patrick Hand', cursive;
+    font-size:14.5px;
+    line-height:1.4;
+    margin:0;
+    color:var(--ink);
+  }
+  .step .ref{
+    font-family:'Patrick Hand', cursive;
+    font-size:12px;
+    opacity:.65;
+    margin-top:6px;
+    display:block;
+  }
+  .step .stamp{
+    position:absolute;
+    top:-8px; right:-8px;
+    width:58px; height:58px;
+    border:3px solid var(--rust);
+    border-radius:50%;
+    color:var(--rust);
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center;
+    line-height:1.05;
+    transform:rotate(-14deg);
+    opacity:0;
+    pointer-events:none;
+    background:rgba(255,255,255,.6);
+  }
+  .step.done .stamp{ opacity:.92; animation:stampIn .45s cubic-bezier(.3,1.4,.4,1) both; }
+  .step.done p{ opacity:.55; }
+  .step.done h3{ text-decoration:line-through; text-decoration-color:rgba(181,80,46,.5); text-decoration-thickness:2px; }
+ 
+  .check-badge{
+    position:absolute; top:10px; right:10px;
+    width:26px; height:26px;
+    border-radius:50%;
+    border:2.5px solid var(--ink);
+    background:rgba(255,255,255,.75);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Caveat', cursive; font-weight:700; font-size:17px;
+    color:transparent;
+    transition:all .2s ease;
+    cursor:pointer;
+    z-index:2;
+  }
+  .step .check-badge{ top:-4px; left:-4px; right:auto; }
+  .done .check-badge, .checked .check-badge{
+    color:var(--rust); border-color:var(--rust); background:#fff;
+    transform:scale(1.12) rotate(-8deg);
+  }
+  .done .check-badge::after, .checked .check-badge::after{ content:"✓"; }
+  .check-badge:hover{ transform:scale(1.15); }
+ 
+  .k1-bg{ background:var(--sage); } .k2-bg{ background:var(--dustyblue); } .k3-bg{ background:var(--mustard); }
+  .k4-bg{ background:var(--olive); } .k5-bg{ background:var(--terracota); } .k6-bg{ background:var(--cream); }
+ 
+  /* ---------- chest / anexos ---------- */
+  .chest-header{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    margin:6px 0 20px;
+  }
+  .chest-header h2{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:32px;
+    margin:0;
+    color:var(--ink);
+    transform:rotate(-1deg);
+  }
+  .anexos-row{
+    display:flex;
+    justify-content:center;
+    gap:26px;
+    flex-wrap:wrap;
+    padding:0 40px;
+  }
+  .note{
+    position:relative;
+    width:300px;
+    background:var(--cream);
+    padding:16px 18px 18px;
+    box-shadow:0 6px 14px rgba(0,0,0,.16);
+    font-family:'Patrick Hand', cursive;
+    font-size:14px;
+    line-height:1.45;
+    cursor:pointer;
+    transition:transform .25s ease, box-shadow .25s ease;
+    animation:fadeUp .6s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .note:nth-child(1){ transform:rotate(-2.5deg); background:var(--sage); animation-delay:.05s; }
+  .note:nth-child(2){ transform:rotate(1.5deg); background:var(--mustard); animation-delay:.12s; }
+  .note:nth-child(3){ transform:rotate(-1.5deg); background:var(--dustyblue); animation-delay:.19s; }
+  .note:nth-child(4){ transform:rotate(2.5deg); background:var(--terracota); animation-delay:.26s; }
+  .note:hover{ transform:rotate(0deg) scale(1.04) translateY(-4px); box-shadow:0 14px 24px rgba(0,0,0,.24); }
+  .note:active{ transform:rotate(0deg) scale(.99); }
+  .note.checked{ box-shadow:0 4px 8px rgba(0,0,0,.16); filter:saturate(.75) brightness(.97); }
+  .note.checked h4{ text-decoration:line-through; text-decoration-color:rgba(181,80,46,.55); }
+  .note .pin{
+    position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+    width:16px; height:16px; border-radius:50%;
+    background:var(--rust);
+    box-shadow:0 2px 3px rgba(0,0,0,.35);
+  }
+  .note h4{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:21px;
+    margin:4px 0 6px;
+    padding-right:22px;
+    cursor:pointer;
+  }
+  .note h4:hover{ text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--rust); }
+  .note h4::after{
+    content:"ver más 🔍";
+    display:block;
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:18px;
+    color:var(--rust);
+    opacity:.9;
+  }
+ 
+  .bottom-caption{
+    text-align:center;
+    font-family:'Caveat', cursive;
+    font-size:19px;
+    color:var(--ink);
+    opacity:.75;
+    margin-top:26px;
+  }
+ 
+  /* ---------- modal ---------- */
+  .modal-backdrop{
+    display:none; position:fixed; inset:0; background:rgba(30,25,18,.6); z-index:100;
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .modal-backdrop.open{ display:flex; animation:fadeUp .25s ease both; }
+  .modal-box{
+    position:relative; width:660px; max-width:100%; max-height:82vh; overflow-y:auto;
+    background:var(--paper); padding:34px 32px 30px; border-radius:6px;
+    box-shadow:0 30px 60px rgba(0,0,0,.5); transform:rotate(-0.4deg);
+    animation:popScale .3s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .modal-box .tape{ position:absolute; width:120px; left:50%; top:-16px; transform:translateX(-50%) rotate(-3deg); }
+  .modal-close{
+    position:absolute; top:14px; right:16px; width:34px; height:34px; border-radius:50%;
+    border:2.5px solid var(--ink); background:var(--paper); font-family:'Caveat', cursive; font-weight:700;
+    font-size:20px; line-height:1; color:var(--ink); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .2s ease, background .2s ease;
+  }
+  .modal-close:hover{ transform:rotate(90deg) scale(1.08); background:var(--terracota); }
+  .modal-box h2{ font-family:'Caveat', cursive; font-weight:700; font-size:36px; margin:6px 40px 4px 0; color:var(--ink); }
+  .modal-box .modal-ref{ font-family:'Patrick Hand', cursive; font-size:13px; opacity:.65; margin-bottom:14px; display:block; }
+  .modal-box .modal-body{ font-family:'Patrick Hand', cursive; font-size:16px; line-height:1.55; color:var(--ink); }
+  .modal-box .modal-body p{ margin:0 0 12px; }
+  .modal-box .modal-body b{ font-weight:700; color:var(--rust); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-outer">
+    <div class="page">
+      <div class="tape t1"></div>
+      <div class="tape t2"></div>
+ 
+      <div class="howto-badge">
+        <div class="pin"></div>
+        <b>¿Cómo se usa?</b>
+        Toca una parada del camino (o una nota) para leer el detalle. Usa el círculo ✓ para marcarla como repasada.
+      </div>
+      <div class="progress-badge" id="progressBadge">
+        <div class="pin"></div>
+        Progreso: <span id="progressCount">0</span>/10 ✎
+      </div>
+ 
+      <div class="title-plate">
+        <div class="pin"></div>
+        <svg class="compass" width="38" height="38" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.2">
+          <circle cx="20" cy="20" r="15"/>
+          <polygon points="20,9 24,20 20,31 16,20" fill="#B5502E" stroke="none"/>
+          <line x1="20" y1="3" x2="20" y2="7" stroke-linecap="round"/>
+        </svg>
+        <h1>La ruta de la extrapolación</h1>
+        <p>De la muestra a la población total — NIA 530, Apartado 14 (A18–A20)</p>
+      </div>
+ 
+      <div class="trail">
+        <svg width="1450" height="1780" viewBox="0 0 1450 1780">
+          <path class="trail-line-bg" d="M735,180 Q700,260 725,330 Q760,400 715,460 Q680,530 725,620 Q765,700 715,760 Q680,830 725,910 Q765,990 715,1050 Q680,1120 725,1200 Q765,1280 715,1340 Q690,1400 725,1470"/>
+          <path class="trail-line-dash" d="M735,180 Q700,260 725,330 Q760,400 715,460 Q680,530 725,620 Q765,700 715,760 Q680,830 725,910 Q765,990 715,1050 Q680,1120 725,1200 Q765,1280 715,1340 Q690,1400 725,1470"/>
+ 
+          <line x1="762" y1="180" x2="850" y2="185" stroke="#2A5C8A" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+          <line x1="710" y1="460" x2="650" y2="465" stroke="#DE9C7C" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+          <line x1="762" y1="760" x2="850" y2="765" stroke="#B5502E" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+          <line x1="710" y1="1050" x2="650" y2="1055" stroke="#1C7C74" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+          <line x1="725" y1="1340" x2="850" y2="1345" stroke="#8A6B2E" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+        </svg>
+ 
+        <!-- markers -->
+        <div class="marker k1" style="left:706px; top:150px;"><div class="ring"></div><div class="core">1</div></div>
+        <div class="marker k2" style="left:680px; top:430px;"><div class="ring"></div><div class="core">2</div></div>
+        <div class="marker k3" style="left:706px; top:730px;"><div class="ring"></div><div class="core">3</div></div>
+        <div class="marker k4" style="left:680px; top:1020px;"><div class="ring"></div><div class="core">4</div></div>
+        <div class="marker k5" style="left:706px; top:1310px;"><div class="ring"></div><div class="core">5</div></div>
+        <div class="marker k6" style="left:680px; top:1580px;"><div class="ring"></div><div class="core">6</div></div>
+ 
+        <!-- STEP 1 -->
+        <div class="step right k1-bg" data-id="w1" style="left:850px; top:118px;">
+          <div class="pin"></div>
+          <div class="check-badge" title="Marcar como repasado"></div>
+          <div class="step-head">
+            <svg class="icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><circle cx="20" cy="20" r="14"/><polygon points="20,9 24,20 20,31 16,20" fill="#3B2E22" stroke="none"/><line x1="20" y1="3" x2="20" y2="7" stroke-linecap="round"/></svg>
+            <h3>Parada 1 — ¿Qué es extrapolar?</h3>
+          </div>
+          <span class="see-more">ver más 🔍</span>
+          <p>Proyectar la incorrección hallada en la muestra sobre toda la población, para estimar su magnitud real más allá de lo examinado.</p>
+          <span class="ref">Apartado 14</span>
+        </div>
+ 
+        <!-- STEP 2 -->
+        <div class="step left k2-bg" data-id="w2" style="left:110px; top:398px;">
+          <div class="pin"></div>
+          <div class="check-badge" title="Marcar como repasado"></div>
+          <div class="step-head">
+            <svg class="icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><path d="M20 4 C11 4 6 11 6 18 C6 27 20 36 20 36 C20 36 34 27 34 18 C34 11 29 4 20 4 Z"/><circle cx="20" cy="17" r="5"/></svg>
+            <h3>Parada 2 — Uso obligatorio</h3>
+          </div>
+          <span class="see-more">ver más 🔍</span>
+          <p>En pruebas de detalle es obligatorio extrapolar, aunque el resultado puede no bastar para fijar el importe exacto a corregir.</p>
+          <span class="ref">Ref. A18</span>
+        </div>
+ 
+        <!-- STEP 3 -->
+        <div class="step right k3-bg" data-id="w3" style="left:850px; top:698px;">
+          <div class="pin"></div>
+          <div class="check-badge" title="Marcar como repasado"></div>
+          <div class="step-head">
+            <svg class="icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><line x1="20" y1="34" x2="20" y2="18" stroke-linecap="round"/><line x1="20" y1="18" x2="8" y2="6" stroke-linecap="round"/><line x1="20" y1="18" x2="32" y2="6" stroke-linecap="round"/></svg>
+            <h3>Parada 3 — El desvío de las anomalías</h3>
+          </div>
+          <span class="see-more">ver más 🔍</span>
+          <p>Una incorrección calificada como anomalía puede excluirse de la extrapolación general — pero su efecto se sigue vigilando aparte.</p>
+          <span class="ref">Ref. A19</span>
+        </div>
+ 
+        <!-- STEP 4 -->
+        <div class="step left k4-bg" data-id="w4" style="left:110px; top:988px;">
+          <div class="pin"></div>
+          <div class="check-badge" title="Marcar como repasado"></div>
+          <div class="step-head">
+            <svg class="icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><ellipse cx="14" cy="26" rx="5" ry="9" transform="rotate(-15 14 26)"/><ellipse cx="28" cy="14" rx="5" ry="9" transform="rotate(15 28 14)"/></svg>
+            <h3>Parada 4 — El atajo de los controles</h3>
+          </div>
+          <span class="see-more">ver más 🔍</span>
+          <p>En pruebas de controles no hace falta extrapolar aparte: el % de desviación de la muestra ya ES el % extrapolado.</p>
+          <span class="ref">Ref. A20 · NIA 330.17</span>
+        </div>
+ 
+        <!-- STEP 5 -->
+        <div class="step right k5-bg" data-id="w5" style="left:850px; top:1278px;">
+          <div class="pin"></div>
+          <div class="check-badge" title="Marcar como repasado"></div>
+          <div class="step-head">
+            <svg class="icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><rect x="6" y="6" width="28" height="6" rx="2"/><rect x="6" y="17" width="28" height="6" rx="2"/><rect x="6" y="28" width="28" height="6" rx="2"/></svg>
+            <h3>Parada 5 — El terreno por estratos</h3>
+          </div>
+          <span class="see-more">ver más 🔍</span>
+          <p>Si la población se dividió en estratos, cada uno se extrapola por separado y luego se combinan los resultados.</p>
+          <span class="ref">Anexo 1</span>
+        </div>
+ 
+        <!-- STEP 6 -->
+        <div class="step left k6-bg" data-id="w6" style="left:110px; top:1548px;">
+          <div class="pin"></div>
+          <div class="check-badge" title="Marcar como repasado"></div>
+          <div class="step-head">
+            <svg class="icon" width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><line x1="20" y1="6" x2="20" y2="36" stroke-linecap="round"/><rect x="20" y="8" width="14" height="7" rx="1"/><rect x="6" y="17" width="14" height="7" rx="1"/></svg>
+            <h3>Meta — Compararla con lo tolerable</h3>
+          </div>
+          <span class="see-more">ver más 🔍</span>
+          <p>La incorrección extrapolada, más la anómala si la hay, se compara con la tolerable para saber si la muestra dio una base razonable.</p>
+          <span class="ref">Apartado 15 · A22</span>
+        </div>
+      </div>
+ 
+      <div class="chest-header">
+        <svg width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="#3B2E22" stroke-width="2.4"><path d="M6 20 h28 v14 a2 2 0 0 1 -2 2 h-24 a2 2 0 0 1 -2 -2 z"/><path d="M6 20 a14 10 0 0 1 28 0"/><rect x="17" y="18" width="6" height="6" rx="1"/></svg>
+        <h2>el cofre de notas extra</h2>
+      </div>
+      <div class="anexos-row">
+        <div class="note" data-id="n1">
+          <div class="pin"></div>
+          <div class="check-badge"></div>
+          <h4>Ejemplo: proyección simple</h4>
+          Si en una muestra de $80,000 se hallan $400 de incorrección, y la población vale $4,000,000 → (400 ÷ 80,000) × 4,000,000 = $20,000 extrapolados.
+        </div>
+        <div class="note" data-id="n2">
+          <div class="pin"></div>
+          <div class="check-badge"></div>
+          <h4>Extrapolada vs. tolerable</h4>
+          Cuanto más se acerque la incorrección extrapolada a la tolerable, mayor la probabilidad de que la población realmente la supere.
+        </div>
+        <div class="note" data-id="n3">
+          <div class="pin"></div>
+          <div class="check-badge"></div>
+          <h4>Relación con la NIA 330</h4>
+          Si se detectan desviaciones en controles en los que el auditor confía, la NIA 330 (apartado 17) indica cómo responder.
+        </div>
+        <div class="note" data-id="n4">
+          <div class="pin"></div>
+          <div class="check-badge"></div>
+          <h4>Estratificación y ponderación</h4>
+          La estratificación (Anexo 1) reduce variabilidad y facilita una extrapolación más precisa, sobre todo con selección ponderada por valor.
+        </div>
+      </div>
+ 
+      <p class="bottom-caption">hecho a mano, con cariño de auditor ✎ — sigue el camino parada por parada</p>
+    </div>
+  </div>
+</div>
+ 
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal-box">
+    <div class="tape"></div>
+    <button class="modal-close" id="modalClose" aria-label="Cerrar">✕</button>
+    <h2 id="modalTitle"></h2>
+    <span class="modal-ref" id="modalRef"></span>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+ 
+<script>
+  const details = {
+    w1: {
+      title: 'Parada 1 — ¿Qué es extrapolar?',
+      ref: 'Apartado 14',
+      html: `<p>Extrapolar significa proyectar sobre el conjunto de la población el patrón de incorrección observado en la muestra, para poder decir algo razonable sobre partidas que nunca se examinaron una por una.</p>
+        <p>Es el puente entre "lo que vi en mi muestra" y "lo que probablemente ocurre en el total de la población". Sin extrapolación, el auditor solo podría opinar sobre los elementos efectivamente revisados.</p>`
+    },
+    w2: {
+      title: 'Parada 2 — Uso obligatorio en pruebas de detalle',
+      ref: 'Ref. A18',
+      html: `<p>El apartado 14 exige que, en pruebas de detalle, el auditor extrapole las incorrecciones encontradas en la muestra a toda la población.</p>
+        <p>El objetivo inmediato es obtener una <b>visión general de la magnitud</b> del problema. Sin embargo, esa extrapolación general <b>puede no ser suficiente</b> para determinar el importe exacto que debe registrarse como ajuste — para eso suele hacer falta investigar más a fondo (A18).</p>`
+    },
+    w3: {
+      title: 'Parada 3 — El desvío de las anomalías',
+      ref: 'Ref. A19',
+      html: `<p>Una <b>anomalía</b> es una incorrección o desviación que se puede demostrar que no es representativa del resto de la población — un error puntual causado por un evento único.</p>
+        <p>Cuando el auditor logra un alto grado de certidumbre de ello (apartado 13), puede excluir la anomalía del cálculo de extrapolación general. Pero excluirla de la extrapolación <b>no significa ignorarla</b>: si no se corrige, su efecto se sigue sumando por separado (A19).</p>`
+    },
+    w4: {
+      title: 'Parada 4 — El atajo de los controles',
+      ref: 'Ref. A20 · NIA 330.17',
+      html: `<p>En pruebas de controles el cálculo es más directo: el <b>porcentaje de desviación observado en la muestra ES</b>, por definición, el porcentaje que se extrapola a la población.</p>
+        <p>Ejemplo: si el auditor revisó 60 transacciones y encontró 3 desviaciones, ese 5% es la mejor estimación del porcentaje de desviación en toda la población. Cuando ocurren en controles en los que el auditor confiaba, la <b>NIA 330 (apartado 17)</b> orienta cómo ajustar la respuesta (A20).</p>`
+    },
+    w5: {
+      title: 'Parada 5 — El terreno por estratos',
+      ref: 'Anexo 1',
+      html: `<p>Cuando la población fue dividida en estratos —por valor monetario o antigüedad de saldo—, la extrapolación no se hace de una sola vez sobre el total.</p>
+        <p><b>Cada estrato se extrapola por separado</b>, usando los resultados de la muestra de ese estrato. Solo después se combinan para estimar el efecto conjunto sobre la totalidad del saldo o tipo de transacciones.</p>`
+    },
+    w6: {
+      title: 'Meta — Compararla con lo tolerable',
+      ref: 'Apartado 15 · A22',
+      html: `<p>La incorrección extrapolada —más la anómala, si la hay— es la <b>mejor estimación</b> del auditor sobre la incorrección real en toda la población.</p>
+        <p>El siguiente paso es compararla con la <b>incorrección tolerable</b>. Si la suma la supera, la muestra no ofrece una base razonable. Incluso si no la supera, cuanto más cerca esté del límite, mayor la probabilidad de que la población sí lo supere.</p>`
+    },
+    n1: {
+      title: 'Ejemplo: proyección simple',
+      ref: 'Método habitual — no una fórmula literal de la norma',
+      html: `<p>La forma más común es calcular la proporción de incorrección hallada en la muestra y aplicarla a toda la población.</p>
+        <p><b>Ejemplo:</b> la muestra representa $80,000 y en ella se hallan $400 de incorrección (0.5%). Si la población vale $4,000,000:</p>
+        <p style="text-align:center; font-size:18px;"><b>(400 ÷ 80,000) × 4,000,000 = $20,000</b></p>
+        <p>Este resultado es la mejor estimación — no un hecho comprobado — y se compara contra la incorrección tolerable (A22).</p>`
+    },
+    n2: {
+      title: 'Extrapolada vs. tolerable',
+      ref: 'Ref. A22',
+      html: `<p>La NIA 530 vincula el resultado de la extrapolación con la incorrección tolerable definida al diseñar la muestra (apartado 5(i)).</p>
+        <p>Cuanto más se acerque la suma de la incorrección extrapolada y la anómala a ese límite, mayor la probabilidad de que la real lo supere — una señal de alerta aunque técnicamente "pase".</p>`
+    },
+    n3: {
+      title: 'Relación con la NIA 330',
+      ref: 'Ref. A20 · NIA 330.17',
+      html: `<p>Cuando las desviaciones extrapoladas provienen de controles en los que el auditor confiaba, no basta con registrar el hallazgo.</p>
+        <p>La NIA 330 (apartado 17) exige evaluar si el control sigue siendo confiable o si hay que <b>aumentar los procedimientos sustantivos</b> en esa área.</p>`
+    },
+    n4: {
+      title: 'Estratificación y ponderación',
+      ref: 'Ref. Anexo 1',
+      html: `<p>La estratificación agrupa la población en subconjuntos similares —casi siempre valor monetario— antes de seleccionar la muestra.</p>
+        <p>Reduce el tamaño de muestra necesario y hace la extrapolación <b>más precisa</b>, porque cada estrato es más homogéneo. Combinada con selección ponderada por valor, concentra el esfuerzo en las partidas que más pesan en el resultado final.</p>`
+    }
+  };
+ 
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalRef = document.getElementById('modalRef');
+  const modalBody = document.getElementById('modalBody');
+  const modalClose = document.getElementById('modalClose');
+ 
+  function openModal(id){
+    const d = details[id];
+    if (!d) return;
+    modalTitle.textContent = d.title;
+    modalRef.textContent = d.ref;
+    modalBody.innerHTML = d.html;
+    modalBackdrop.classList.add('open');
+  }
+  function closeModal(){ modalBackdrop.classList.remove('open'); }
+ 
+  document.querySelectorAll('.step h3').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openModal(el.closest('.step').getAttribute('data-id'));
+    });
+  });
+  document.querySelectorAll('.note h4').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openModal(el.closest('.note').getAttribute('data-id'));
+    });
+  });
+ 
+  modalClose.addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', (e) => { if (e.target === modalBackdrop) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+ 
+  const steps = document.querySelectorAll('.step');
+  const notes = document.querySelectorAll('.note');
+  const progressEl = document.getElementById('progressCount');
+  const total = steps.length + notes.length;
+ 
+  function updateProgress(){
+    const done = document.querySelectorAll('.step.done').length + document.querySelectorAll('.note.checked').length;
+    progressEl.textContent = done;
+    if (done === total) document.getElementById('progressBadge').style.background = 'var(--sage)';
+  }
+ 
+  steps.forEach(s => {
+    const id = s.getAttribute('data-id');
+    const checkbox = s.querySelector('.check-badge');
+    s.addEventListener('click', () => { openModal(id); });
+    if (checkbox) {
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        s.classList.toggle('done');
+        updateProgress();
+      });
+    }
+  });
+ 
+  notes.forEach(n => {
+    const id = n.getAttribute('data-id');
+    const checkbox = n.querySelector('.check-badge');
+    n.addEventListener('click', () => { openModal(id); });
+    if (checkbox) {
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        n.classList.toggle('checked');
+        updateProgress();
+      });
+    }
+  });
+</script>
+ 
+</body>
+</html>
